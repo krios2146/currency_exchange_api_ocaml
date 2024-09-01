@@ -1,4 +1,4 @@
 (executable
- (public_name currency_exchange_api_ocaml)
+ (public_name currency_exchange_api)
  (name main)
  (libraries currency_exchange_api_ocaml dream yojson))
