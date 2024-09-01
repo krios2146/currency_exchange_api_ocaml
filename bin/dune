@@ -1,4 +1,6 @@
 (executable
  (public_name currency_exchange_api)
  (name main)
- (libraries currency_exchange_api_ocaml dream yojson))
+ (libraries currency_exchange_api_ocaml dream)
+ (preprocess
+  (pps lwt_ppx ppx_yojson_conv)))
