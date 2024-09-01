@@ -1,0 +1,2 @@
+(library
+ (name currency_exchange_api_ocaml))
