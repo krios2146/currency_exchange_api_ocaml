@@ -1,6 +1,6 @@
 (library
  (name handlers)
- (libraries dream)
+ (libraries dream repository)
  (modules handlers)
  (preprocess
   (pps lwt_ppx ppx_yojson_conv)))
