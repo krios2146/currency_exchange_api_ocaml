@@ -4,7 +4,7 @@ let () =
   @@ Dream.router
        [
          Dream.get "/currencies" Handlers.get_currencies;
-         Dream.get "/currency/:code" Handlers.not_implemented;
+         Dream.get "/currency/:code" Handlers.get_currency_by_code;
          Dream.post "/currencies" Handlers.not_implemented;
          Dream.get "/exchangeRates" Handlers.not_implemented;
          Dream.get "/exchnageRate/:codes" Handlers.not_implemented;
