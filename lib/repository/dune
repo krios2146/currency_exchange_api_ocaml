@@ -1,0 +1,6 @@
+(library
+ (name repository)
+ (libraries caqti-driver-sqlite3 dream)
+ (modules repository)
+ (preprocess
+  (pps lwt_ppx)))
