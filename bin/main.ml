@@ -1,9 +1,13 @@
-open Ppx_yojson_conv_lib.Yojson_conv.Primitives
-
-type message = { message : string } [@@deriving yojson]
-
-let hello_world _ =
-  { message = "Hello, world!" }
-  |> yojson_of_message |> Yojson.Safe.to_string |> Dream.json
-
-let () = Dream.run @@ Dream.logger @@ Dream.router [ Dream.get "/" hello_world ]
+let () =
+  Dream.run @@ Dream.logger
+  @@ Dream.router
+       [
+         Dream.get "/currencies" Handlers.not_implemented;
+         Dream.get "/currency/:code" Handlers.not_implemented;
+         Dream.post "/currencies" Handlers.not_implemented;
+         Dream.get "/exchangeRates" Handlers.not_implemented;
+         Dream.get "/exchnageRate/:codes" Handlers.not_implemented;
+         Dream.post "/exchangeRates" Handlers.not_implemented;
+         Dream.patch "/exchnageRate/:codes" Handlers.not_implemented;
+         Dream.get "/exchnage" Handlers.not_implemented;
+       ]
