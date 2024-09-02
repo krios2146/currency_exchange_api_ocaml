@@ -21,6 +21,11 @@ let get_path_param_opt req param =
 let is_possibly_valid_code code =
   let regexp = Str.regexp "^[A-Z][A-Z][A-Z]$" in
   Str.string_match regexp code 0
+
+let respond_bad_request message =
+  let message = build_message_response message in
+  Dream.respond ~status:`Bad_Request ~headers:[ json_header ] message
+
 let not_implemented _ =
   let message = build_message_response "This endpoint is not implemented yet" in
   Dream.respond ~status:`Not_Implemented ~headers:[ json_header ] message
@@ -37,14 +42,9 @@ let get_currencies req =
 let get_currency_by_code req =
   let code = get_path_param_opt req "code" in
   match code with
-  | None ->
-      let message = build_message_response "Parameter code is missing" in
-      Dream.respond ~status:`Bad_Request ~headers:[ json_header ] message
+  | None -> respond_bad_request "Parameter code is missing"
   | Some code when not (is_possibly_valid_code code) ->
-      let message =
-        build_message_response "Parameter code is invalid; Use ISO-4217 format"
-      in
-      Dream.respond ~status:`Bad_Request ~headers:[ json_header ] message
+      respond_bad_request "Parameter code is invalid; Use ISO-4217 format"
   | Some code -> (
       let%lwt currency =
         Dream.sql req (Repository.find_currency_by_code code)
@@ -56,8 +56,8 @@ let get_currency_by_code req =
           in
           Dream.respond ~status:`OK ~headers:[ json_header ] currency
       | None ->
-          let message =
-            build_message_response
-              (Printf.sprintf "Currency with code: '%s' is not found" code)
+          respond_bad_request
+            (Printf.sprintf "Currency with code: '%s' is not found" code))
+
           in
           Dream.respond ~status:`Not_Found ~headers:[ json_header ] message)
