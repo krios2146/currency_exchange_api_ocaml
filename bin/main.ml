@@ -1,8 +1,9 @@
 let () =
   Dream.run @@ Dream.logger
+  @@ Dream.sql_pool "sqlite3:database.sqlite"
   @@ Dream.router
        [
-         Dream.get "/currencies" Handlers.not_implemented;
+         Dream.get "/currencies" Handlers.get_currencies;
          Dream.get "/currency/:code" Handlers.not_implemented;
          Dream.post "/currencies" Handlers.not_implemented;
          Dream.get "/exchangeRates" Handlers.not_implemented;
