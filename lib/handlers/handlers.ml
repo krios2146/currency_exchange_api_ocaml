@@ -1,5 +1,6 @@
 open Ppx_yojson_conv_lib.Yojson_conv.Primitives
 open Lwt.Infix
+open Yojson.Safe
 
 type message = { message : string } [@@deriving yojson]
 
@@ -14,7 +15,7 @@ let json_header = ("Content-Type", "application/json")
 let not_implemented _ =
   let message =
     { message = "This endpoint is not implemented yet" }
-    |> yojson_of_message |> Yojson.Safe.to_string
+    |> yojson_of_message |> to_string
   in
   Dream.respond ~status:`Not_Implemented ~headers:[ json_header ] message
 
@@ -23,7 +24,7 @@ let get_currencies req =
   >|= List.map to_response_currency
   >|= List.map yojson_of_currency
   >|= (fun currencies -> `List currencies)
-  >|= Yojson.Safe.to_string
+  >|= to_string
   >>= fun currencies ->
   Dream.respond ~status:`OK ~headers:[ json_header ] currencies
 
@@ -34,8 +35,7 @@ let get_currency_by_code req =
     match currency with
     | Some currency ->
         let currency =
-          currency |> to_response_currency |> yojson_of_currency
-          |> Yojson.Safe.to_string
+          currency |> to_response_currency |> yojson_of_currency |> to_string
         in
         Dream.respond ~status:`OK ~headers:[ json_header ] currency
     | None ->
@@ -43,12 +43,12 @@ let get_currency_by_code req =
           {
             message = Printf.sprintf "Currency with '%s' code is not found" code;
           }
-          |> yojson_of_message |> Yojson.Safe.to_string
+          |> yojson_of_message |> to_string
         in
         Dream.respond ~status:`Not_Found ~headers:[ json_header ] message
   with Not_found ->
     let message =
       { message = "Parameter code is missing" }
-      |> yojson_of_message |> Yojson.Safe.to_string
+      |> yojson_of_message |> to_string
     in
     Dream.respond ~status:`Bad_Request ~headers:[ json_header ] message
