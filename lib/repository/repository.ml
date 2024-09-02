@@ -1,3 +1,5 @@
+open Caqti_request.Infix
+
 module type DB = Caqti_lwt.CONNECTION
 
 type currency = { id : int; code : string; full_name : string; sign : string }
@@ -9,10 +11,18 @@ let currency_t =
 
 let find_all_currencies =
   let query =
-    let open Caqti_request.Infix in
     (Caqti_type.unit ->* currency_t)
       "SELECT id, code, full_name, sign FROM Currencies"
   in
   fun (module Db : DB) ->
     let%lwt currencies_or_error = Db.collect_list query () in
     Caqti_lwt.or_fail currencies_or_error
+
+let find_currency_by_code code =
+  let query =
+    (Caqti_type.string ->? currency_t)
+      "SELECT id, code, full_name, sign FROM Currencies WHERE code = ?"
+  in
+  fun (module Db : DB) ->
+    let%lwt optional_currency = Db.find_opt query code in
+    Caqti_lwt.or_fail optional_currency
