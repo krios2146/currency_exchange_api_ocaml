@@ -18,6 +18,9 @@ let build_message_response message =
 let get_path_param_opt req param =
   try Some (Dream.param req param) with Not_found -> None
 
+let is_possibly_valid_code code =
+  let regexp = Str.regexp "^[A-Z][A-Z][A-Z]$" in
+  Str.string_match regexp code 0
 let not_implemented _ =
   let message = build_message_response "This endpoint is not implemented yet" in
   Dream.respond ~status:`Not_Implemented ~headers:[ json_header ] message
@@ -30,10 +33,6 @@ let get_currencies req =
   >|= to_string
   >>= fun currencies ->
   Dream.respond ~status:`OK ~headers:[ json_header ] currencies
-
-let is_possibly_valid_code code =
-  let regexp = Str.regexp "^[A-Z]{3}$" in
-  Str.string_match regexp code 0
 
 let get_currency_by_code req =
   let code = get_path_param_opt req "code" in
