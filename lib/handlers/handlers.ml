@@ -12,11 +12,14 @@ let to_response_currency (c : Repository.currency) =
 
 let json_header = ("Content-Type", "application/json")
 
+let build_message_response message =
+  { message } |> yojson_of_message |> to_string
+
+let get_path_param_opt req param =
+  try Some (Dream.param req param) with Not_found -> None
+
 let not_implemented _ =
-  let message =
-    { message = "This endpoint is not implemented yet" }
-    |> yojson_of_message |> to_string
-  in
+  let message = build_message_response "This endpoint is not implemented yet" in
   Dream.respond ~status:`Not_Implemented ~headers:[ json_header ] message
 
 let get_currencies req =
@@ -29,26 +32,24 @@ let get_currencies req =
   Dream.respond ~status:`OK ~headers:[ json_header ] currencies
 
 let get_currency_by_code req =
-  try
-    let code = Dream.param req "code" in
-    let%lwt currency = Dream.sql req (Repository.find_currency_by_code code) in
-    match currency with
-    | Some currency ->
-        let currency =
-          currency |> to_response_currency |> yojson_of_currency |> to_string
-        in
-        Dream.respond ~status:`OK ~headers:[ json_header ] currency
-    | None ->
-        let message =
-          {
-            message = Printf.sprintf "Currency with '%s' code is not found" code;
-          }
-          |> yojson_of_message |> to_string
-        in
-        Dream.respond ~status:`Not_Found ~headers:[ json_header ] message
-  with Not_found ->
-    let message =
-      { message = "Parameter code is missing" }
-      |> yojson_of_message |> to_string
-    in
-    Dream.respond ~status:`Bad_Request ~headers:[ json_header ] message
+  let code = get_path_param_opt req "code" in
+  match code with
+  | None ->
+      let message = build_message_response "Parameter code is missing" in
+      Dream.respond ~status:`Bad_Request ~headers:[ json_header ] message
+  | Some code -> (
+      let%lwt currency =
+        Dream.sql req (Repository.find_currency_by_code code)
+      in
+      match currency with
+      | Some currency ->
+          let currency =
+            currency |> to_response_currency |> yojson_of_currency |> to_string
+          in
+          Dream.respond ~status:`OK ~headers:[ json_header ] currency
+      | None ->
+          let message =
+            build_message_response
+              (Printf.sprintf "Currency with code: '%s' is not found" code)
+          in
+          Dream.respond ~status:`Not_Found ~headers:[ json_header ] message)
