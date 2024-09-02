@@ -8,7 +8,9 @@
  (github krios2146/currency_exchange_api_ocaml))
 
 (authors "Vladimir Kidyaev")
+
 (maintainers "Vladimir Kidyaev")
+
 (license "Apache-2.0")
 
 (documentation https://github.com/krios2146/currency_exchange_api_ocaml)
