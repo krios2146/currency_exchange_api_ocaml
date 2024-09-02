@@ -13,6 +13,7 @@ depends: [
   "yojson"
   "dream"
   "ppx_yojson_conv"
+  "caqti-driver-sqlite3"
   "odoc" {with-doc}
 ]
 build: [
