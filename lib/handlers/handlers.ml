@@ -31,11 +31,20 @@ let get_currencies req =
   >>= fun currencies ->
   Dream.respond ~status:`OK ~headers:[ json_header ] currencies
 
+let is_possibly_valid_code code =
+  let regexp = Str.regexp "^[A-Z]{3}$" in
+  Str.string_match regexp code 0
+
 let get_currency_by_code req =
   let code = get_path_param_opt req "code" in
   match code with
   | None ->
       let message = build_message_response "Parameter code is missing" in
+      Dream.respond ~status:`Bad_Request ~headers:[ json_header ] message
+  | Some code when not (is_possibly_valid_code code) ->
+      let message =
+        build_message_response "Parameter code is invalid; Use ISO-4217 format"
+      in
       Dream.respond ~status:`Bad_Request ~headers:[ json_header ] message
   | Some code -> (
       let%lwt currency =
