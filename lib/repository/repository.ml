@@ -3,6 +3,7 @@ open Caqti_request.Infix
 module type DB = Caqti_lwt.CONNECTION
 
 type currency = { id : int; code : string; full_name : string; sign : string }
+type error = Constraint_violation | Unknown_error
 
 let currency_t =
   let encode c = Ok (c.id, c.code, c.full_name, c.sign) in
@@ -26,3 +27,22 @@ let find_currency_by_code code =
   fun (module Db : DB) ->
     let%lwt optional_currency = Db.find_opt query code in
     Caqti_lwt.or_fail optional_currency
+
+let save_currency code name sign =
+  let query =
+    (Caqti_type.(t3 string string string) ->! currency_t)
+      "INSERT INTO Currencies (code, full_name, sign) VALUES (?, ?, ?) \
+       RETURNING id, code, full_name, sign"
+  in
+  fun (module Db : DB) ->
+    Dream.log "Code to insert: %s" code;
+    let%lwt result = Db.find query (code, name, sign) in
+    match result with
+    | Ok currency -> Lwt_result.return currency
+    (* Clearly skill issues with pattern matching here *)
+    | Error (`Response_failed e) -> (
+        match Caqti_error.cause (`Response_failed e) with
+        | #Caqti_error.integrity_constraint_violation ->
+            Lwt_result.fail Constraint_violation
+        | _ -> Lwt_result.fail Unknown_error)
+    | Error _ -> Lwt_result.fail Unknown_error
