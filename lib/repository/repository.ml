@@ -16,8 +16,8 @@ let find_all_currencies =
       "SELECT id, code, full_name, sign FROM Currencies"
   in
   fun (module Db : DB) ->
-    let%lwt currencies_or_error = Db.collect_list query () in
-    Caqti_lwt.or_fail currencies_or_error
+    let%lwt currencies = Db.collect_list query () in
+    Lwt_result.lift (Result.map_error (fun _ -> Unknown_error) currencies)
 
 let find_currency_by_code code =
   let query =
