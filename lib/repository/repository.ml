@@ -26,7 +26,8 @@ let find_currency_by_code code =
   in
   fun (module Db : DB) ->
     let%lwt optional_currency = Db.find_opt query code in
-    Caqti_lwt.or_fail optional_currency
+    Lwt_result.lift
+      (Result.map_error (fun _ -> Unknown_error) optional_currency)
 
 let save_currency code name sign =
   let query =
