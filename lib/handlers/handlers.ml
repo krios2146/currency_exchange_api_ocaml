@@ -26,6 +26,10 @@ let respond_bad_request message =
   let message = build_message_response message in
   Dream.respond ~status:`Bad_Request ~headers:[ json_header ] message
 
+let respond_not_found message =
+  let message = build_message_response message in
+  Dream.respond ~status:`Not_Found ~headers:[ json_header ] message
+
 let respond_conflict message =
   let message = build_message_response message in
   Dream.respond ~status:`Conflict ~headers:[ json_header ] message
@@ -54,18 +58,17 @@ let get_currency_by_code req =
   | Some code when not (is_possibly_valid_code code) ->
       respond_bad_request "Parameter code is invalid; Use ISO-4217 format"
   | Some code -> (
-      let%lwt currency =
-        Dream.sql req (Repository.find_currency_by_code code)
-      in
-      match currency with
-      | Some currency ->
+      let%lwt result = Dream.sql req (Repository.find_currency_by_code code) in
+      match result with
+      | Ok (Some currency) ->
           let currency =
             currency |> to_response_currency |> yojson_of_currency |> to_string
           in
           Dream.respond ~status:`OK ~headers:[ json_header ] currency
-      | None ->
-          respond_bad_request
-            (Printf.sprintf "Currency with code: '%s' is not found" code))
+      | Ok None ->
+          respond_not_found
+            (Printf.sprintf "Currency with code: '%s' is not found" code)
+      | Error _ -> respond_server_error "Server unable to process request")
 
 let add_currency req =
   let%lwt form = Dream.form ~csrf:false req in
