@@ -37,6 +37,10 @@ let is_possibly_valid_code code =
   let regexp = Str.regexp "^[A-Z][A-Z][A-Z]$" in
   Str.string_match regexp code 0
 
+let is_possibly_valid_codes codes =
+  let regexp = Str.regexp "^[A-Z][A-Z][A-Z][A-Z][A-Z][A-Z]$" in
+  Str.string_match regexp codes 0
+
 let respond_bad_request message =
   let message = build_message_response message in
   Dream.respond ~status:`Bad_Request ~headers:[ json_header ] message
@@ -123,3 +127,31 @@ let get_exchange_rates req =
       |> to_string
       |> fun currencies ->
       Dream.respond ~status:`OK ~headers:[ json_header ] currencies
+
+let get_exchange_rate_by_codes req =
+  let codes = get_path_param_opt req "codes" in
+  match codes with
+  | None -> respond_bad_request "Parameter code is missing"
+  | Some codes when not (is_possibly_valid_codes codes) ->
+      respond_bad_request "Parameter codes is invalid; Use ISO-4217 format"
+  | Some codes -> (
+      let base_currency_code = String.sub codes 0 3 in
+      let target_currency_code = String.sub codes 3 3 in
+      let%lwt result =
+        Dream.sql req
+          (Repository.find_exchange_rate_by_codes base_currency_code
+             target_currency_code)
+      in
+      match result with
+      | Ok (Some exchange_rate) ->
+          let currency =
+            exchange_rate |> to_response_exchange_rate
+            |> yojson_of_exchange_rate |> to_string
+          in
+          Dream.respond ~status:`OK ~headers:[ json_header ] currency
+      | Ok None ->
+          respond_not_found
+            (Printf.sprintf
+               "Exchange rate with codes: '%s' -> '%s' is not found"
+               base_currency_code target_currency_code)
+      | Error _ -> respond_server_error "Server unable to process request")
