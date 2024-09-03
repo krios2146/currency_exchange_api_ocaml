@@ -21,3 +21,6 @@ val save_currency :
 
 val find_all_exchange_rates :
   (module DB) -> (exchange_rate list, error) result Lwt.t
+
+val find_exchange_rate_by_codes :
+  string -> string -> (module DB) -> (exchange_rate option, error) result Lwt.t

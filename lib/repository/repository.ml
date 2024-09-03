@@ -90,11 +90,14 @@ let save_currency code name sign =
 let find_all_exchange_rates =
   let query =
     (Caqti_type.unit ->* exchange_rate_t)
-      "SELECT e.id AS id, b.id as b_id, b.code as b_code, b.full_name as \
-       b_full_name, b.sign as b_sign, t.id as t_id, t.code as t_code, \
-       t.full_name as t_full_name, t.sign as t_sign, e.rate as rate FROM \
-       Exchange_rates e JOIN Currencies b ON e.base_currency_id = b.id JOIN \
-       Currencies t ON e.target_currency_id = t.id"
+      "SELECT 
+         e.id AS id, \
+         b.id as b_id, b.code as b_code, b.full_name as b_full_name, b.sign as b_sign, \
+         t.id as t_id, t.code as t_code, t.full_name as t_full_name, t.sign as t_sign, \
+         e.rate as rate \
+       FROM Exchange_rates e \
+         JOIN Currencies b ON e.base_currency_id = b.id \
+         JOIN Currencies t ON e.target_currency_id = t.id" [@ocamlformat "disable"]
   in
   fun (module Db : DB) ->
     let%lwt result = Db.collect_list query () in
@@ -103,3 +106,24 @@ let find_all_exchange_rates =
     | Error e ->
         Dream.log "Error: %s" (Caqti_error.show e);
         Lwt_result.fail Unknown_error
+
+let find_exchange_rate_by_codes base_code target_code =
+  let query =
+    (Caqti_type.(t2 string string) ->? exchange_rate_t)
+      "SELECT 
+         e.id AS id, \
+         b.id as b_id, b.code as b_code, b.full_name as b_full_name, b.sign as b_sign, \
+         t.id as t_id, t.code as t_code, t.full_name as t_full_name, t.sign as t_sign, \
+         e.rate as rate \
+       FROM Exchange_rates e \
+         JOIN Currencies b ON e.base_currency_id = b.id \
+         JOIN Currencies t ON e.target_currency_id = t.id \
+       WHERE \
+         b.code = ? AND t.code = ?" [@ocamlformat "disable"]
+  in 
+  fun (module Db : DB) ->
+    let%lwt optional_exchange_rate =
+      Db.find_opt query (base_code, target_code)
+    in
+    Lwt_result.lift
+      (Result.map_error (fun _ -> Unknown_error) optional_exchange_rate)
