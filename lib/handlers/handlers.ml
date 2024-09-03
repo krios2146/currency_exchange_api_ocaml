@@ -1,5 +1,4 @@
 open Ppx_yojson_conv_lib.Yojson_conv.Primitives
-open Lwt.Infix
 open Yojson.Safe
 
 type message = { message : string } [@@deriving yojson]
@@ -43,13 +42,17 @@ let not_implemented _ =
   Dream.respond ~status:`Not_Implemented ~headers:[ json_header ] message
 
 let get_currencies req =
-  Dream.sql req Repository.find_all_currencies
-  >|= List.map to_response_currency
-  >|= List.map yojson_of_currency
-  >|= (fun currencies -> `List currencies)
-  >|= to_string
-  >>= fun currencies ->
-  Dream.respond ~status:`OK ~headers:[ json_header ] currencies
+  let%lwt result = Dream.sql req Repository.find_all_currencies in
+  match result with
+  | Error _ -> respond_server_error "Server unable to process request"
+  | Ok currencies ->
+      currencies
+      |> List.map to_response_currency
+      |> List.map yojson_of_currency
+      |> (fun currencies -> `List currencies)
+      |> to_string
+      |> fun currencies ->
+      Dream.respond ~status:`OK ~headers:[ json_header ] currencies
 
 let get_currency_by_code req =
   let code = get_path_param_opt req "code" in
