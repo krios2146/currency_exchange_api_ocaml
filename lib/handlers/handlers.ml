@@ -6,8 +6,24 @@ type message = { message : string } [@@deriving yojson]
 type currency = { id : int; code : string; name : string; sign : string }
 [@@deriving yojson]
 
+type exchange_rate = {
+  id : int;
+  baseCurrency : currency;
+  targetCurrency : currency;
+  rate : float;
+}
+[@@deriving yojson]
+
 let to_response_currency (c : Repository.currency) =
   { id = c.id; code = c.code; name = c.full_name; sign = c.sign }
+
+let to_response_exchange_rate (er : Repository.exchange_rate) =
+  {
+    id = er.id;
+    baseCurrency = to_response_currency er.base_currency;
+    targetCurrency = to_response_currency er.target_currency;
+    rate = er.rate;
+  }
 
 let json_header = ("Content-Type", "application/json")
 
@@ -94,3 +110,16 @@ let add_currency req =
       | Error Unknown_error ->
           respond_server_error "Server unable to process request")
   | _ -> respond_bad_request "Unexpected / missing form values"
+
+let get_exchange_rates req =
+  let%lwt result = Dream.sql req Repository.find_all_exchange_rates in
+  match result with
+  | Error _ -> respond_server_error "Server unable to process request"
+  | Ok exchange_rates ->
+      exchange_rates
+      |> List.map to_response_exchange_rate
+      |> List.map yojson_of_exchange_rate
+      |> (fun currencies -> `List currencies)
+      |> to_string
+      |> fun currencies ->
+      Dream.respond ~status:`OK ~headers:[ json_header ] currencies
