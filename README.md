@@ -1,4 +1,12 @@
-# currency_exchange_api_ocaml
+# Currency Exchange API
+
+[![OCaml](https://img.shields.io/badge/OCaml-black?style=for-the-badge&logo=ocaml)](https://ocaml.org/)
+[![Dune](https://img.shields.io/badge/dune-black?style=for-the-badge)](https://github.com/ocaml/dune)
+[![Dream](https://img.shields.io/badge/dream-black?style=for-the-badge)](https://aantron.github.io/dream/)
+[![SQLite](https://img.shields.io/badge/sqlite-black?style=for-the-badge&logo=sqlite)](https://www.sqlite.org/)
+[![Caqti](https://img.shields.io/badge/caqti-black?style=for-the-badge)](https://github.com/paurkedal/ocaml-caqti)
+
+![GitHub License](https://img.shields.io/github/license/krios2146/currency_exchange_api_ocaml?style=flat-square&labelColor=black&color=black)
 
 Simple REST API with currencies and exchange rates as resources and exchange of the currency as the main functionality
 
