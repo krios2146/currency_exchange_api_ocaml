@@ -27,3 +27,10 @@ val find_exchange_rate_by_codes :
 
 val save_exchange_rate :
   int -> int -> float -> (module DB) -> (exchange_rate, error) result Lwt.t
+
+val update_exchange_rate :
+  string ->
+  string ->
+  float ->
+  (module DB) ->
+  (exchange_rate, error) result Lwt.t

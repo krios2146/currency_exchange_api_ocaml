@@ -167,3 +167,39 @@ let save_exchange_rate base_currency_id target_currency_id rate =
             Lwt_result.fail Constraint_violation
         | _ -> Lwt_result.fail Unknown_error)
     | Error _ -> Db.rollback () >>= fun _ -> Lwt_result.fail Unknown_error
+
+let update_exchange_rate base_code target_code rate =
+  let update_query =
+    (Caqti_type.(t3 float string string ) ->! Caqti_type.int)
+      "UPDATE Exchange_rates \
+      SET rate = ? \
+      WHERE base_currency_id = (SELECT id FROM Currencies WHERE code = ?) \
+      AND target_currency_id = (SELECT id FROM Currencies WHERE code = ?) \
+      RETURNING id" [@ocamlformat "disable"]
+  in
+  let select_query =
+    (Caqti_type.int ->! exchange_rate_t)
+      "SELECT 
+         e.id AS id, \
+         b.id as b_id, b.code as b_code, b.full_name as b_full_name, b.sign as b_sign, \
+         t.id as t_id, t.code as t_code, t.full_name as t_full_name, t.sign as t_sign, \
+         e.rate as rate \
+       FROM Exchange_rates e \
+         JOIN Currencies b ON e.base_currency_id = b.id \
+         JOIN Currencies t ON e.target_currency_id = t.id \
+       WHERE \
+         e.id = ?" [@ocamlformat "disable"]
+  in
+  fun (module Db : DB) ->
+    Db.start () >>= fun _ ->
+    let update_result = Db.find update_query (rate, base_code, target_code) in
+    let%lwt select_result =
+      Lwt_result.bind update_result (fun id -> Db.find select_query id)
+    in
+    match select_result with
+    | Ok exchange_rate ->
+        Db.commit () >>= fun _ -> Lwt_result.return exchange_rate
+    | Error e ->
+        Db.rollback () >>= fun _ ->
+        Dream.log "Error %s" (Caqti_error.show e);
+        Lwt_result.fail Unknown_error
