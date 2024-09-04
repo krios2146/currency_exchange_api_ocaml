@@ -157,9 +157,11 @@ let save_exchange_rate base_currency_id target_currency_id rate =
       Lwt_result.bind insert_result (fun id -> Db.find select_query id)
     in
     match select_result with
-    | Ok exchange_rate -> Lwt_result.return exchange_rate
+    | Ok exchange_rate ->
+        Db.commit () >>= fun _ -> Lwt_result.return exchange_rate
     (* Clearly skill issues with pattern matching here *)
     | Error (`Response_failed e) -> (
+        Db.rollback () >>= fun _ ->
         match Caqti_error.cause (`Response_failed e) with
         | #Caqti_error.integrity_constraint_violation ->
             Lwt_result.fail Constraint_violation
