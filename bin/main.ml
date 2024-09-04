@@ -9,6 +9,6 @@ let () =
          Dream.get "/exchangeRates" Handlers.get_exchange_rates;
          Dream.get "/exchangeRate/:codes" Handlers.get_exchange_rate_by_codes;
          Dream.post "/exchangeRates" Handlers.add_exchange_rate;
-         Dream.patch "/exchangeRate/:codes" Handlers.not_implemented;
+         Dream.patch "/exchangeRate/:codes" Handlers.update_exchange_rate;
          Dream.get "/exchange" Handlers.not_implemented;
        ]
