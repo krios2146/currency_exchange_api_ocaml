@@ -37,9 +37,14 @@ let is_possibly_valid_code code =
   let regexp = Str.regexp "^[A-Z][A-Z][A-Z]$" in
   Str.string_match regexp code 0
 
-let is_possibly_valid_codes codes =
+let is_possibly_valid_combined_codes codes =
   let regexp = Str.regexp "^[A-Z][A-Z][A-Z][A-Z][A-Z][A-Z]$" in
   Str.string_match regexp codes 0
+
+let is_possibly_valid_codes code_1 code_2 =
+  is_possibly_valid_code code_1 && is_possibly_valid_code code_2
+
+let parse_rate rate = try Some (Float.of_string rate) with Failure _ -> None
 
 let respond_bad_request message =
   let message = build_message_response message in
@@ -132,7 +137,7 @@ let get_exchange_rate_by_codes req =
   let codes = get_path_param_opt req "codes" in
   match codes with
   | None -> respond_bad_request "Parameter code is missing"
-  | Some codes when not (is_possibly_valid_codes codes) ->
+  | Some codes when not (is_possibly_valid_combined_codes codes) ->
       respond_bad_request "Parameter codes is invalid; Use ISO-4217 format"
   | Some codes -> (
       let base_currency_code = String.sub codes 0 3 in
@@ -155,3 +160,71 @@ let get_exchange_rate_by_codes req =
                "Exchange rate with codes: '%s' -> '%s' is not found"
                base_currency_code target_currency_code)
       | Error _ -> respond_server_error "Server unable to process request")
+
+(* Skill issues here *)
+let add_exchange_rate req =
+  let%lwt form = Dream.form ~csrf:false req in
+  match form with
+  | `Ok
+      [
+        ("baseCurrencyCode", base_currency_code);
+        ("rate", _);
+        ("targetCurrencyCode", target_currency_code);
+      ]
+    when not (is_possibly_valid_codes base_currency_code target_currency_code)
+    ->
+      respond_bad_request
+        "One of currency codes is invalid; Use ISO-4217 format"
+  | `Ok
+      [
+        ("baseCurrencyCode", base_currency_code);
+        ("rate", rate);
+        ("targetCurrencyCode", target_currency_code);
+      ] -> (
+      let rate = parse_rate rate in
+      match rate with
+      | None -> respond_bad_request "Rate is invalid"
+      | Some rate -> (
+          let%lwt base_currency_result =
+            Dream.sql req (Repository.find_currency_by_code base_currency_code)
+          in
+          let%lwt target_currency_result =
+            Dream.sql req
+              (Repository.find_currency_by_code target_currency_code)
+          in
+          match (base_currency_result, target_currency_result) with
+          | Ok (Some _), Ok None ->
+              respond_not_found
+                (Printf.sprintf "Currency with code: '%s' is not found"
+                   target_currency_code)
+          | Ok None, Ok (Some _) ->
+              respond_not_found
+                (Printf.sprintf "Currency with code: '%s' is not found"
+                   base_currency_code)
+          | Ok None, Ok None ->
+              respond_not_found
+                (Printf.sprintf "Currencies with codes: '%s', '%s' is not found"
+                   base_currency_code target_currency_code)
+          | Error _, _ ->
+              respond_server_error "Server unable to process request"
+          | _, Error _ ->
+              respond_server_error "Server unable to process request"
+          | Ok (Some base_currency), Ok (Some target_currency) -> (
+              let%lwt result =
+                Dream.sql req
+                  (Repository.save_exchange_rate base_currency.id
+                     target_currency.id rate)
+              in
+              match result with
+              | Ok er ->
+                  let exchange_rate =
+                    er |> to_response_exchange_rate |> yojson_of_exchange_rate
+                    |> to_string
+                  in
+                  Dream.respond ~status:`Created ~headers:[ json_header ]
+                    exchange_rate
+              | Error Constraint_violation ->
+                  respond_conflict "This exchange rate already exists"
+              | Error _ ->
+                  respond_server_error "Server unable to process request")))
+  | _ -> respond_bad_request "Unexpected / missing form values"
