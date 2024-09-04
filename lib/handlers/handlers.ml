@@ -14,6 +14,15 @@ type exchange_rate = {
 }
 [@@deriving yojson]
 
+type exchange_operation = {
+  baseCurrency : currency;
+  targetCurrency : currency;
+  rate : float;
+  amount : float;
+  convertedAmount : float;
+}
+[@@deriving yojson]
+
 let to_response_currency (c : Repository.currency) =
   { id = c.id; code = c.code; name = c.full_name; sign = c.sign }
 
@@ -23,6 +32,16 @@ let to_response_exchange_rate (er : Repository.exchange_rate) =
     baseCurrency = to_response_currency er.base_currency;
     targetCurrency = to_response_currency er.target_currency;
     rate = er.rate;
+  }
+
+let to_response_exchange_operation (er : Repository.exchange_rate) amount
+    camount =
+  {
+    baseCurrency = to_response_currency er.base_currency;
+    targetCurrency = to_response_currency er.target_currency;
+    rate = er.rate;
+    amount;
+    convertedAmount = camount;
   }
 
 let json_header = ("Content-Type", "application/json")
@@ -44,7 +63,7 @@ let is_possibly_valid_combined_codes codes =
 let is_possibly_valid_codes code_1 code_2 =
   is_possibly_valid_code code_1 && is_possibly_valid_code code_2
 
-let parse_rate rate = try Some (Float.of_string rate) with Failure _ -> None
+let parse_float rate = try Some (Float.of_string rate) with Failure _ -> None
 
 let respond_bad_request message =
   let message = build_message_response message in
@@ -181,7 +200,7 @@ let add_exchange_rate req =
         ("rate", rate);
         ("targetCurrencyCode", target_currency_code);
       ] -> (
-      let rate = parse_rate rate in
+      let rate = parse_float rate in
       match rate with
       | None -> respond_bad_request "Rate is invalid"
       | Some rate -> (
@@ -239,7 +258,7 @@ let update_exchange_rate req =
       let%lwt form = Dream.form ~csrf:false req in
       match form with
       | `Ok [ ("rate", rate) ] -> (
-          let rate = parse_rate rate in
+          let rate = parse_float rate in
           match rate with
           | None -> respond_bad_request "Rate is invalid"
           | Some rate -> (
@@ -261,3 +280,44 @@ let update_exchange_rate req =
                   Dream.respond ~status:`OK ~headers:[ json_header ]
                     exchange_rate))
       | _ -> respond_bad_request "Request body field `rate` is missing")
+
+let exchange req =
+  let from_cur = Dream.query req "from" in
+  let to_cur = Dream.query req "to" in
+  let amount = Dream.query req "amount" in
+  match (from_cur, to_cur, amount) with
+  | Some from_cur, Some to_cur, Some amount -> (
+      let is_valid_from = is_possibly_valid_code from_cur in
+      let is_valid_to = is_possibly_valid_code to_cur in
+      let amount_opt = parse_float amount in
+      match (is_valid_from, is_valid_to, amount_opt) with
+      | true, true, Some amount -> (
+          let%lwt result =
+            Dream.sql req
+              (Repository.find_exchange_rate_by_codes from_cur to_cur)
+          in
+          match result with
+          | Ok (Some er) ->
+              let converted_amount = amount *. er.rate in
+              let exchange_operation =
+                to_response_exchange_operation er amount converted_amount
+              in
+              let exchange_operation =
+                exchange_operation |> yojson_of_exchange_operation |> to_string
+              in
+              Dream.respond ~status:`OK ~headers:[ json_header ]
+                exchange_operation
+          | Ok None ->
+              respond_not_found
+                (Printf.sprintf "Exchange rate '%s' -> '%s' no found" from_cur
+                   to_cur)
+          | _ -> respond_server_error "Server unable to process request")
+      | false, _, _ ->
+          respond_bad_request "Parameter `from` is invalid; Use ISO-4217 format"
+      | _, false, _ ->
+          respond_bad_request "Parameter `to` is invalid; Use ISO-4217 format"
+      | _, _, None -> respond_bad_request "Parameter `amount` is invalid")
+  | _, _, _ ->
+      respond_bad_request
+        "Ensure that `from`, `to` and `amount` parameters are present in the \
+         request"
