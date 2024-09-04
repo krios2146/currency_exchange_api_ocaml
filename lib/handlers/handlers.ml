@@ -228,3 +228,36 @@ let add_exchange_rate req =
               | Error _ ->
                   respond_server_error "Server unable to process request")))
   | _ -> respond_bad_request "Unexpected / missing form values"
+
+let update_exchange_rate req =
+  let codes = get_path_param_opt req "codes" in
+  match codes with
+  | None -> respond_bad_request "Parameter code is missing"
+  | Some codes when not (is_possibly_valid_combined_codes codes) ->
+      respond_bad_request "Parameter codes is invalid; Use ISO-4217 format"
+  | Some codes -> (
+      let%lwt form = Dream.form ~csrf:false req in
+      match form with
+      | `Ok [ ("rate", rate) ] -> (
+          let rate = parse_rate rate in
+          match rate with
+          | None -> respond_bad_request "Rate is invalid"
+          | Some rate -> (
+              let base_currency_code = String.sub codes 0 3 in
+              let target_currency_code = String.sub codes 3 3 in
+              let%lwt result =
+                Dream.sql req
+                  (Repository.update_exchange_rate base_currency_code
+                     target_currency_code rate)
+              in
+              match result with
+              | Error _ ->
+                  respond_server_error "Server unable to process request"
+              | Ok er ->
+                  let exchange_rate =
+                    er |> to_response_exchange_rate |> yojson_of_exchange_rate
+                    |> to_string
+                  in
+                  Dream.respond ~status:`OK ~headers:[ json_header ]
+                    exchange_rate))
+      | _ -> respond_bad_request "Request body field `rate` is missing")
